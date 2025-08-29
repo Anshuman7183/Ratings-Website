@@ -1,0 +1,56 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  ADMIN
+  USER
+  OWNER
+}
+
+model User {
+  id        Int       @id @default(autoincrement())
+  name      String    @db.VarChar(60)     // validated 20–60 in API
+  email     String    @unique
+  password  String
+  address   String    @db.VarChar(400)    // REQUIRED by challenge (max 400)
+  role      Role      @default(USER)
+  stores    Store[]   @relation("OwnerStores")
+  ratings   Rating[]
+  createdAt DateTime  @default(now())
+}
+
+model Store {
+  id        Int       @id @default(autoincrement())
+  name      String    @db.VarChar(60)     // searchable (index below)
+  address   String    @db.VarChar(400)    // searchable (index below)
+  ownerId   Int?
+  owner     User?     @relation("OwnerStores", fields: [ownerId], references: [id])
+  ratings   Rating[]
+  createdAt DateTime  @default(now())
+
+  @@index([name])
+  @@index([address])
+}
+
+model Rating {
+  id        Int       @id @default(autoincrement())
+  userId    Int
+  storeId   Int
+  value     Int       @db.SmallInt        // validated 1..5 in API
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  user   User   @relation(fields: [userId], references: [id])
+  store  Store  @relation(fields: [storeId], references: [id])
+
+  // One rating per user per store (required for upsert logic)
+  @@unique([userId, storeId])
+}
